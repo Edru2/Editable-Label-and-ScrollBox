@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE MudletPackage>
+<MudletPackage version="1.001">
+	<TriggerPackage />
+	<TimerPackage />
+	<AliasPackage />
+	<ActionPackage />
+	<ScriptPackage>
+		<Script isActive="yes" isFolder="no">
+			<name>EditableTextLabel</name>
+			<packageName></packageName>
+			<script>--Editable TextLabel
+--A Label with editable text
+--by Edru 2020
+
+Editable = Editable or {}
+Editable.TextLabel = Editable.TextLabel or {}
+  
+setmetatable(Editable.TextLabel, Geyser.Label)
+
+
+local function convertToWhiteSpace(message)
+  return string.gsub(message, "&amp;nbsp;", " ")
+end
+
+local function convertFromWhiteSpace(message)
+  return string.gsub(message, " ", "&amp;nbsp;")
+end
+
+
+Editable.TextLabel.textCmd = Editable.TextLabel.textCmd or Geyser.CommandLine:new({x = 0})
+Editable.TextLabel.textCmd:hide()
+
+local function onAction(input)
+    local self = Editable.TextLabel.currentLabel
+    if Editable.TextLabel.textCmd.myTimer then
+      killTimer(Editable.TextLabel.textCmd.myTimer)
+      Editable.TextLabel.textCmd.myTimer = nil
+    end
+    if Editable.TextLabel.textCmd.myStyleTimer then
+      killTimer(Editable.TextLabel.textCmd.myStyleTimer)
+      Editable.TextLabel.textCmd.myStyleTimer = nil
+    end
+    self.message = convertFromWhiteSpace(input)
+    Editable.TextLabel.textCmd:hide()
+    self:disableClickthrough()
+    self.hook(input)
+    if self.flexible then
+      self:resize(Editable.TextLabel.currentLabel:get_width(), nil)
+    end
+    
+    self:echo()
+end
+
+local function editText(self)
+    if Editable.TextLabel.currentLabel then
+      onAction(Editable.TextLabel.textCmd:getText())
+    end
+    local w, h = calcFontSize(self.fontSize)
+    local charWidth = self:getCharWidth()
+    Editable.TextLabel.currentLabel = self
+    
+    if self.flexible then
+      Editable.TextLabel.textCmd.myTimer = tempTimer(0.2, function() self:reposition() end, true)
+    end
+    
+    self:enableClickthrough()
+    Editable.TextLabel.textCmd:changeContainer(self)
+    Editable.TextLabel.textCmd:resize(self:getCmdWidth(), h * 2)
+    -- calculate command line offset it seems to be character height - 8 / 2 (don't ask me why but it works)
+    Editable.TextLabel.textCmd:move(nil, "50%-"..Editable.TextLabel.textCmd:get_height()/2 - ((h - 8) / 2 - 1))
+    Editable.TextLabel.textCmd:raise()
+    Editable.TextLabel.textCmd:show()
+    Editable.TextLabel.textCmd:show(true)
+    Editable.TextLabel.textCmd:print(convertToWhiteSpace(self.message))
+    self:echo("")
+    self:setCmdStyleSheet()
+    if self.flexible then
+      self:resize(charWidth, nil)
+    end
+end
+
+Editable.TextLabel.textCmd:setAction(onAction)
+
+function Editable.TextLabel:getAlignCharWidth()
+  if self.formatTable.alignment ~= "center" then
+    return 0
+  end
+  
+  Editable.TextLabel.textCmd.myStyleTimer = Editable.TextLabel.textCmd.myStyleTimer or tempTimer(0.2, function() self:setCmdStyleSheet() end, true)
+  local cmdText = Editable.TextLabel.textCmd:getText()
+  local w, h = calcFontSize(self.fontSize)
+  local msg_len = utf8.len(cmdText)
+  local value = self:get_width()/2
+  if msg_len &gt; 1 then
+    value = value - (msg_len + 1)/3 * 1.4 * w
+  else
+    value = value - w
+  end
+  return value
+end
+
+function Editable.TextLabel:setCmdStyleSheet()
+    local fontStyle, textDeco = "",""
+    if self.formatTable.italics then
+      fontStyle = "italic"
+    end
+    if self.formatTable.bold then
+      fontStyle = fontStyle.." bold";
+    end
+    if self.formatTable.strikethrough then
+      textDeco = "line-through"
+    end
+    if self.formatTable.underline then
+      textDeco = textDeco.." underline"
+    end
+    
+    Editable.TextLabel.textCmd:setStyleSheet(string.format([[QPlainTextEdit{
+        %s
+        background-color: %s;
+        font: %s %spt "%s";
+        color: %s;
+        text-decoration: %s;
+        padding-left: %spx;
+    }]], self.borderStyle, self.cmdBgColor, fontStyle, self.fontSize, self.font, self.fgColor, textDeco, self:getAlignCharWidth()))
+end
+
+function Editable.TextLabel:getCharWidth()
+  local w, h = calcFontSize(self.fontSize)
+  return function() 
+    return math.min(self.container:get_width(), (math.max(1, utf8.len(Editable.TextLabel.textCmd:getText())) + 1) * w) 
+  end
+end
+
+function Editable.TextLabel:getCmdWidth()
+  local w, h = calcFontSize(self.fontSize)
+  return function() 
+    return self:get_width() + 3 * w
+  end
+end
+
+Editable.TextLabel.parent = Geyser.Label
+
+function Editable.TextLabel:new(cons, container)
+  -- Initiate and set label specific things
+  cons = cons or {}
+  cons.height = cons.height or "2c"
+  cons.type = cons.type or "textlabel"
+  cons.font = cons.font or "BitStream Vera Sans Mono"
+  local me = self.parent:new(cons, container)
+  setmetatable(me, self)
+  self.__index = self
+  me:setStyleSheet("padding-left: 2px;")
+  if me.flexible then
+    local msg = convertToWhiteSpace(me.message)
+    me:resize((utf8.len(msg) + 1).."c", nil)
+  end
+  me:setClickCallback(editText, me)
+  me.charWidth = me:getCharWidth()
+  me.hook = me.hook or function() end
+  me.borderStyle = me.borderStyle or [[]]
+  me.cmdBgColor = me.cmdBgColor or [[rgba(0, 0, 0, 0%)]]
+  return me
+end</script>
+			<eventHandlerList />
+		</Script>
+	</ScriptPackage>
+	<KeyPackage />
+	<HelpPackage>
+		<helpURL></helpURL>
+	</HelpPackage>
+</MudletPackage>

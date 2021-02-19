@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE MudletPackage>
+<MudletPackage version="1.001">
+	<TriggerPackage />
+	<TimerPackage />
+	<AliasPackage />
+	<ActionPackage />
+	<ScriptPackage>
+		<Script isActive="yes" isFolder="no">
+			<name>ScrollBar</name>
+			<packageName></packageName>
+			<script>--Adjustable ScrollBar
+-- ScrollBar made of Geyser.Elements
+--by Edru 2020
+
+Adjustable = Adjustable or {}
+
+--------------------------------------
+--                                  --
+-- The Geyser Layout Manager by guy --
+-- Adjustable ScrollBar by Edru     --
+--                                  --
+--------------------------------------
+-- Adjustable ScrollBar
+-- @module AdjustableScrollBar
+Adjustable.ScrollBar = Adjustable.ScrollBar or Geyser.Container:new({name = "AdjustableScrollBarClass"})
+
+function Adjustable.ScrollBar:onMove(event)
+    local handle = self.handle
+    local container = self.handle.container
+    if not self.clicked then
+        return 
+    end
+        
+    local winh = container.get_height()
+    local x, y = getMousePosition()
+    local  y1, h = handle:get_y(), handle:get_height()
+    y1 = y1 - container.get_y()
+    local dy = self.oldy - y
+    local max, min = math.max, math.min
+    local ty = max(0,y1-dy)
+    ty =  min(ty, winh - h)
+    ty = ty/winh * 100
+    handle:move(nil, string.format("%.5f%%", ty))
+    self:onScrollBarMoved()
+    self.oldy = y
+end
+    
+function Adjustable.ScrollBar:onClick(event)
+    self.oldx, self.oldy = getMousePosition()
+    self.clicked = true
+end
+
+function Adjustable.ScrollBar:onRelease(event)
+    self.clicked = false
+    self:onScrollBarMoved(true)
+end
+
+function Adjustable.ScrollBar:onTopClick(event)   
+    if self.scrollTimer then 
+        killTimer(self.scrollTimer)
+        self.scrollTimer = nil 
+    end
+    self.scrollTimer = tempTimer(0.1, 
+    function()
+        self:scrollUp()
+    end, 
+    true)
+end
+
+function Adjustable.ScrollBar:onBottomClick(event)
+    if self.scrollTimer then 
+        killTimer(self.scrollTimer)
+        self.scrollTimer = nil 
+    end
+    self.scrollTimer = tempTimer(0.05, 
+    function()
+        self:scrollDown()
+    end, 
+    true)
+end
+
+function Adjustable.ScrollBar:onButtonRelease(event)
+    if self.scrollTimer then 
+        killTimer(self.scrollTimer)
+        self.scrollTimer = nil 
+    end
+end
+
+function Adjustable.ScrollBar:setRange(size)
+    self.range = math.max(0, size)
+    local handle = self.handle
+    local container = self.handle.container
+    local minSize = 20 / self.scrollBar:get_height() * 100 
+    local height = math.max(minSize, 100 - self.range)
+    handle:resize(nil, string.format("%s%%",height))
+    self.referenceSize = 100 - minSize
+end
+
+function Adjustable.ScrollBar:setValue(value)
+    local handle = self.handle
+    if self.range &gt; self.referenceSize then
+        value = value / self.range * self.referenceSize
+    end
+    handle:move(nil, string.format("%s%%", value))
+end
+
+
+function Adjustable.ScrollBar:onScrollBarMoved(released)
+    local handle = self.handle
+    local value = string.match(handle.y, "(%d*%.?%d+)")
+    if self.range &gt; self.referenceSize then
+      value = math.floor(value * (self.range/self.referenceSize) + 0.5)
+    else
+      value = math.floor(value)
+    end
+    
+    if not released then
+      raiseEvent("sysScrollBarMoved", self, value)
+    else
+      raiseEvent("sysScrollBarRelease", self, value)
+    end
+end
+
+
+function Adjustable.ScrollBar:scrollUp()
+    local factor = 1
+    local handle = self.handle
+    local y = string.match(handle.y, "(%d*%.?%d+)")
+    
+    if self.range &gt; self.referenceSize then
+      factor = self.referenceSize / self.range
+    end
+    
+    handle:move(nil, string.format("%s%%", math.max(0, y - factor))) 
+    self:onScrollBarMoved()
+end
+
+function Adjustable.ScrollBar:scrollDown()
+    local factor = 1
+    local handle = self.handle
+    local height = string.match(handle.height, "%d+")
+    local y = string.match(handle.y, "(%d*%.?%d+)")
+    if self.range &gt; self.referenceSize then
+      factor = self.referenceSize / self.range
+    end
+    handle:move(nil, string.format("%s%%", math.min(100 - height, y + factor)))
+    self:onScrollBarMoved()
+end
+
+function Adjustable.ScrollBar:onWheelEvent(event)
+    if event.angleDeltaY &lt; 0 then
+        self:scrollDown()
+    else
+        self:scrollUp()
+    end
+end
+
+
+function Adjustable.ScrollBar:createScrollBar()
+    self.scrollBar = Geyser.Label:new(
+    {x = 0, y = "15px",
+       name = string.format("%s_scrollBar", self.name), width = "100%",
+       height = "-15px", stylesheet ="background-color: rgb(45, 51, 56);"
+     }, 
+      self)
+    self.top = Geyser.Label:new({x = 0, y = 0, name = string.format("%s_top", self.name), height = "15px", width = "100%", message = "🞁", format= "cb"}, self)
+    self.bottom = Geyser.Label:new({x = 0, y = "-15px", name = string.format("%s_bottom", self.name), height = "15px", width = "100%", message = "🞃", format= "cb"}, self)
+    self.handleContainer = Geyser.Container:new({name = string.format("%s_handleContainer", self.name),x = 0, y = "15px", height = "-15px", width = "100%"},self)
+
+    self.handle = Geyser.Label:new({
+        name = string.format("%s_handle", self.name), 
+        y = "0%",
+        x = 0, 
+        height = "100px", width = "100%",  
+        stylesheet= [[
+        border: 2px solid rgb(28, 30, 33);
+        border-radius: 6px;
+        background-color: rgb(28, 30, 33);]]}, self.handleContainer)
+    
+    self.top:setClickCallback(self.onTopClick, self)
+    self.bottom:setClickCallback(self.onBottomClick, self)
+    self.top:setReleaseCallback(self.onButtonRelease, self)
+    self.bottom:setReleaseCallback(self.onButtonRelease, self)
+    self.handle:setWheelCallback(self.onWheelEvent, self)
+    
+    self.scrollBar:setWheelCallback(self.onWheelEvent, self)
+    self.handle:setMoveCallback(self.onMove, self)
+    self.handle:setClickCallback(self.onClick, self)
+    self.handle:setReleaseCallback(self.onRelease, self)
+end
+    
+    
+    -- Save a reference to our parent constructor
+Adjustable.ScrollBar.parent = Geyser.Container
+    
+function Adjustable.ScrollBar:new(cons,container)
+    cons = cons or {}
+    cons.type = cons.type or "adjustablescrollbar"
+    local me = self.parent:new(cons, container)
+    setmetatable(me, self)
+    self.__index = self
+    me:createScrollBar()
+    return me
+end</script>
+			<eventHandlerList />
+		</Script>
+		<Script isActive="yes" isFolder="no">
+			<name>ScrollBox</name>
+			<packageName></packageName>
+			<script>-- Adjustable ScrollBox
+-- LabelMenu made of Geyser.Elements
+-- depends on Adjustable.ScrollBar to work
+--by Edru 2020
+
+Adjustable = Adjustable or {}
+
+--------------------------------------
+--                                  --
+-- The Geyser Layout Manager by guy --
+-- Adjustable ScrollBox by Edru     --
+--                                  --
+--------------------------------------
+-- Adjustable ScrollBox
+-- @module AdjustableScrollBox
+
+Adjustable.ScrollBox = Adjustable.ScrollBox or Geyser.Container:new({name = "AdjustableScrollBoxClass"})
+
+
+local function onWheelEvent(self, event)
+  if event.angleDeltaY &lt; 0 then
+    self:scrollUp()
+  else
+    self:scrollDown()
+  end
+  self.myScrollBar:setValue(self.scrollPos)
+end
+
+function Adjustable.ScrollBox:calculateHeight()
+    local heightSum = 0
+    for k,v in pairs(self.VBox.windowList) do
+        heightSum = heightSum + v:get_height()
+    end
+    return heightSum
+end
+
+function Adjustable.ScrollBox:reposition()  
+  Geyser.HBox.reposition(self)
+  self:organizeMenu()
+  self.myScrollBar:setRange(#self.elementTable.windows - #self.VBox.windows)
+  self.myScrollBar:setValue(self.scrollPos)
+end
+
+function Adjustable.ScrollBox:organizeMenu()
+    if self.hidden or self.auto_hidden then
+      return
+    end
+    local windowNr = #self.VBox.windows + self.scrollPos + 1
+    local calcHeight = self:calculateHeight()
+    local contHeight = self:get_height()
+    local window = self.VBox.windowList[self.VBox.windows[#self.VBox.windows]]
+    
+    if calcHeight &gt; contHeight and window and #self.VBox.windows &gt; 1 then
+       self.VBox:remove(window)
+       window:hide()
+       return
+    end
+    
+    window = self.elementTable.windowList[self.elementTable.windows[windowNr]]
+    
+    if not window then
+      if self.scrollPos + #self.VBox.windows == #self.elementTable.windows then 
+        self:scrollDown()
+        self:scrollUp() 
+      end
+      return 
+    end
+      
+    if calcHeight + window:get_height() &lt; contHeight then
+        if not self.VBox.windowList[window.name] then
+          self:add(window)
+        end
+        window:show()
+        self:raiseAll()
+    end
+    
+end
+
+function Adjustable.ScrollBox:add(window, cons)
+  if not window then 
+    return
+  end
+    if self.myAdd then
+      window.v_policy = Geyser.Fixed
+      self.VBox:add(window, cons)
+      if self.elementTable.windowList[window.name] then
+        return
+      end
+      self:addToTable(window)
+      self:organizeMenu()
+      pcall(Geyser.Label.setWheelCallback, window, onWheelEvent, self)
+    else
+      self:add2(window, cons, true)
+    end
+end
+
+function Adjustable.ScrollBox:addToTable(window) 
+    self.elementTable.windows[#self.elementTable.windows + 1] = window.name
+    self.elementTable.windowList[window.name] = window
+    if self.myScrollBar then
+      self:reposition()
+    end
+end
+
+function Adjustable.ScrollBox:scrollUp()
+  if self.VBox.windows[#self.VBox.windows] == self.elementTable.windows[#self.elementTable.windows] then
+    return
+  end
+  self.scrollPos = self.scrollPos + 1
+  local window = self.VBox.windowList[self.VBox.windows[2]]
+  self.VBox:remove(window)
+  window:hide()
+  self:organizeMenu()
+  self.VBox:organize()
+  self:raiseAll()
+end
+
+function Adjustable.ScrollBox:scrollDown()
+  if self.scrollPos == 0  or (#self.VBox.windows == #self.elementTable.windows) then
+    return
+  end
+  self.scrollPos = self.scrollPos - 1
+  local window = self.elementTable.windowList[self.elementTable.windows[2 + self.scrollPos]]
+  self:add(window)
+  self.VBox.windows[#self.VBox.windows] = nil
+  table.insert(self.VBox.windows, 2, window.name)
+  window:show()
+  self:organizeMenu()
+  self.VBox:organize()
+  self:raiseAll()
+end
+
+Adjustable.ScrollBox.parent = Geyser.Container
+
+
+function Adjustable.ScrollBox:createTableContainers()
+    self.HBox = Geyser.HBox:new({name = string.format("%s_HBox", self.name), x = 0, y = 0, width = "100%", height = "100%"}, self)
+    self.VBox = Geyser.VBox:new({name = string.format("%s_VBox", self.name)}, self.HBox)
+    self.myAdd = true
+    self.titleRow =
+    self.titleRow or Geyser.Container:new(
+    {
+        name = string.format("%s_titleRow", self.name), 
+        height = self.rowHeight,
+        v_policy = Geyser.Fixed
+    }, self)
+end
+
+
+function Adjustable.ScrollBox.clearAndRenew(event, scrollbar, value)
+  local self = scrollbar.hook
+  local amount = #self.VBox.windows
+  local pos = value
+  self.ScrollBarReleasedHandler = nil
+  self.scrollPos = value
+  if not self.ScrollBarMovedHandler then
+    self.ScrollBarMovedHandler = registerAnonymousEventHandler("sysScrollBarMoved","Adjustable.ScrollBox.ScrollBarScroll")
+  end
+  for i = 2, amount do
+    local window = self.VBox.windowList[self.VBox.windows[2]]
+    window:hide()
+    self.VBox:remove(window)
+  end
+  
+  for i = 2, amount do
+    local window = self.elementTable.windowList[self.elementTable.windows[2 + pos]]
+    if not window then 
+      break
+    end
+    self:add(window)
+    window:show()
+    pos = pos + 1
+  end
+  
+  self:organizeMenu()
+  self.VBox:organize()
+  self:raiseAll()
+end
+
+function Adjustable.ScrollBox.ScrollBarScroll(event, scrollbar, value)
+  local self = scrollbar.hook
+  
+  if not (self and self.myScrollBar == scrollbar) then
+    return
+  end
+  
+  for i = 1, scrollbar.range do
+    if self.ScrollBarReleasedHandler then 
+      return 
+    end
+    if not scrollbar.scrollTimer then
+      if i &gt; #self.VBox.windows then
+        killAnonymousEventHandler(self.ScrollBarMovedHandler)
+        self.ScrollBarMovedHandler = nil
+        self.ScrollBarReleasedHandler = registerAnonymousEventHandler("sysScrollBarRelease","Adjustable.ScrollBox.clearAndRenew", true)
+      end
+    end
+    
+    if value &gt; self.scrollPos then
+      self:scrollUp()
+    elseif value &lt; self.scrollPos then
+      self:scrollDown()
+    else
+      return
+    end
+  end 
+end
+
+function Adjustable.ScrollBox:createScrollBar()
+    self.scrollBarCont = Geyser.Container:new(
+  {
+    name = string.format("%s_ScrollBarCont", self.name), 
+    h_policy = Geyser.Fixed,
+    width = "15px", 
+    }, 
+  self.HBox)
+  
+  self.myScrollBar = Adjustable.ScrollBar:new(
+  {
+    name = string.format("%s_ScrollBar", self.name), 
+    x = 0, y = self.titleRow.get_height,
+    height = "-0", width = "100%", 
+    hook = self}, 
+  self.scrollBarCont)
+  self.ScrollBarMovedHandler = registerAnonymousEventHandler("sysScrollBarMoved","Adjustable.ScrollBox.ScrollBarScroll")
+end
+
+function Adjustable.ScrollBox:disableScrollBar()
+  self.HBox:remove(self.scrollBarCont)
+  self.scrollBarCont:hide()
+  self.HBox:organize()
+end
+
+
+function Adjustable.ScrollBox:enableScrollBar()
+  self.HBox:add(self.scrollBarCont)
+  self.scrollBarCont:show()
+  self.HBox:organize()
+end
+
+function Adjustable.ScrollBox:new(cons, container)
+    cons = cons or {}
+    cons.type = cons.type or "labeltable"
+    local me = self.parent:new(cons, container)
+    me.add = self.add
+    setmetatable(me, self)
+    self.__index = self
+    me.elementTable = {}
+    me.elementTable.windows = {}
+    me.elementTable.windowList = {}
+    me.rowHeight = me.rowHeight or "3c"
+    me.scrollPos = me.scrollPos or 0
+    me.myAdd = false
+    me:createTableContainers()
+    me:createScrollBar()
+    if me.scrollBar == false then
+      self:disableScrollBar()
+    end
+  return me
+end
+</script>
+			<eventHandlerList />
+		</Script>
+	</ScriptPackage>
+	<KeyPackage />
+	<HelpPackage>
+		<helpURL></helpURL>
+	</HelpPackage>
+</MudletPackage>
